@@ -1,0 +1,602 @@
+#Creacion de data frame con la base de datos
+datos <- read.table("CreditoHipotecario.CSV",header=T,sep=",",stringsAsFactors = TRUE,fill=TRUE)
+View(datos)
+
+##dat<-read.csv("Variables.csv", header=T, sep=";", dec=".")
+#Vista de 6 primeros registros de la base de datos
+head(datos)
+
+#Lista de variables##tipo de variables
+str(datos)
+
+#Breve resumen estadístico por variable
+summary(datos)
+
+#Verificación de casos únicos (duplicados)
+length(unique(datos$DNI))
+
+
+# % Default 
+table(datos$Default)/nrow(datos)*100
+
+# Balanceo mediante undersampling
+#menorcero<-subset(datos,Default==0) 
+#mayoruno<-subset(datos,Default==1)
+
+#set.seed(1234)
+#sample<-sample.int(nrow(mayoruno),nrow(menorcero))
+#length(sample)
+#menorcero.prueba<-menorcero[sample,]
+#length(menorcero.prueba)
+#is.na.data.frame(menorcero.prueba)
+
+#data.train=rbind(menorcero.prueba,menorcero,mayoruno)
+#table(data.train$Default)
+#table(data.train$Default)/nrow(data.train)*100
+
+
+
+##Tecnica oversampling: upsamplig#####
+#install.packages("groupdata2")
+#install.packages("tidyverse")
+#install.packages("caret")
+#library(groupdata2)
+#library(tidyverse)
+#library(caret)
+
+#install.packages("rsample")
+
+#library(rsample)
+
+#Generamos muestras bootstrap, y la función nos regresa un arreglo con  renglones
+
+#set.seed(2020)
+#datos_boot <- bootstraps(datos[sample(1 : nrow(datos), round(sum(datos$Default==0)*round((0.50-((sum(datos$Default==0)/nrow(datos)))),2),0), 
+#                        prob = ifelse(datos$Default == 0,0.90,0.10),replace=FALSE), ],
+#                        times = round(sum(datos$Default==0)*round((0.50-((sum(datos$Default==0)/nrow(datos)))),2),0))
+#datos_boot
+
+
+
+#La columna splits tiene información de las muestras seleccionadas
+#datos_1 <- datos_boot$splits[[1]]
+#datos_1<-as.data.frame(datos_1) 
+
+#nrow(datos_1)
+
+
+#datos<-rbind(datos,datos_1)
+#nrow(datos)
+
+
+# % Default con tecnica oversampling
+#(sum(datos$Default==0)/nrow(datos))*100
+
+table(datos$Default)/nrow(datos)*100
+
+
+#positive <- sum(yreal==0)
+
+#Crear columna nueva para agrupar ingreso
+
+
+#Cuantiles
+quantile(datos$Ingreso,probs=seq(0,1,0.1))
+quantile(datos$Ingreso,probs=c(0.005,0.01,0.02,0.03,0.04,0.05,0.95,0.96,0.97,0.98,0.99)) # outliers
+
+library(pacman)
+p_load(dplyr,ggplot2)
+
+
+
+datos <- datos  %>% mutate(Ingreso_1 = 
+                             case_when(
+                               Ingreso >= 0 & Ingreso <= 91200 ~ 1,
+                               Ingreso > 91200 & Ingreso <= 142400 ~ 2,
+                               Ingreso> 142400  ~ 3)
+)
+
+
+
+#datos <- datos  %>% mutate(Ingreso_tipvivienda = 
+#                             case_when(
+#                               Ingreso >= 0 & Ingreso <= 142400 & TipoVivienda == "Propia"  ~ 1,
+#                               Ingreso >= 0 & Ingreso <= 142400 & (TipoVivienda == "Alquilada" | TipoVivienda == "Familiar") ~ 2,
+#                               Ingreso> 142400 & (TipoVivienda == "Alquilada" | TipoVivienda == "Familiar") ~ 3,
+#                               Ingreso> 142400 & TipoVivienda == "Propia" ~ 4
+#                             )
+#)
+
+
+#### Datos continuos ####
+
+#Histogramas
+hist(datos$Ingreso)
+hist(datos$Flg_vehicular)
+hist(datos$Ingreso_1)
+
+#Diagrama de caja
+boxplot(datos$Ingreso)
+boxplot(datos$Ingreso_1)
+boxplot(datos$Flg_vehicular)
+
+
+
+#### Muestreo ####65% DATA TRAINING
+#install.packages("caTools")
+library(caTools)
+
+set.seed(2020)
+muestra <- sample.split(datos,SplitRatio=0.65)
+datos.train <- subset(datos,muestra==TRUE)
+datos.test <- subset(datos,muestra==FALSE)
+dim(datos.train)
+dim(datos.test)
+
+#### Transformación de variables ####
+datos.train$TARGET <- datos.train$Default
+datos.train$Default <- as.factor(datos.train$Default)
+str(datos.train)
+summary(datos.train$TARGET)
+
+# Reetiquetamos buenos por malos. Bueno=1 y Malos=0
+datos.train$TARGET[datos.train$TARGET == 0] <- 99
+datos.train$TARGET[datos.train$TARGET == 1] <- 0
+datos.train$TARGET[datos.train$TARGET == 99] <- 1
+summary(datos.train$TARGET)
+
+#install.packages("ROSE")
+# % Default 
+#table(datos.train$Default)/nrow(datos.train)*100
+
+
+#library(ROSE)
+
+#over sampling
+#data.balanced.over <- ovun.sample(Default~., data=datos.train, 
+#                                  p=0.5, seed=1, 
+#                                  method="over")$data
+
+#table(data.balanced.over$Default)
+
+#table(datos.train$Default)/nrow(datos.train)*100
+
+#### Análisis de variables (categoricas o continuas) usando árboles de Decisión ####
+## Target: Debe estar en formato FACTOR
+##TEORIA: LA GRAFICA MUESTRA CAJAS QUE NOS INDICA QUE GRUPO TIENE MAYOR PROBABILIDAD DE CAER EN DEFAULT 
+#install.packages("party")
+
+library(party)
+##EJERCICIO 1
+arbol1 <- ctree(data=datos.train, Default ~ Ingreso) #Analisis Bivariado #1
+print(arbol1)
+plot(arbol1)
+
+
+##EJERCICIO 1
+arbol1 <- ctree(data=datos.train, Default ~ Ingreso_1) #Analisis Bivariado #1
+print(arbol1)
+plot(arbol1)
+
+
+arbol2 <- ctree(data=datos.train, Default ~ Flg_vehicular) #Analisis Bivariado
+print(arbol2)
+plot(arbol2)
+
+
+arbol3 <- ctree(data=datos.train, Default ~ TipoVivienda) #Analisis Bivariado
+print(arbol3)
+plot(arbol3)
+
+###COEFICIENTE DE CORRELACION DE PEARSON:  Expresa en qué grado los sujetos tienen el mismo orden en dos variables. 
+## r = 0  ninguna relacion
+## r = 1 Correlación positiva perfecta
+## 0 < r < 1 Correlación positiva
+## r = -1 Correlación negativa perfecta
+## -1 < r < 0 Correlación negativa
+#install.packages("MASS")
+library(MASS)
+
+
+datos.train$TipoVivienda<-as.numeric(datos.train$TipoVivienda)
+
+
+cor(x=datos.train$Ingreso,y=datos.train$TipoVivienda, use ="pairwise.complete.obs" )
+cor(x=datos.train$Ingreso_1,y=datos.train$TipoVivienda, use ="pairwise.complete.obs" )
+
+
+
+##COEFICIENTE DE CORRELACION DE SPEARMAN####
+##cor(x=datos.train$EDAD_2,y=datos.train$ANTIGU_DAD, use ="pairwise.complete.obs",method = "spearman")
+
+
+####Calculo de KS y Gini por variable####
+## ApplicantIncome
+datos.tree<-ctree(Loan_Status ~ ApplicantIncome
+                  ,data=train_parametrica, 
+                  controls=ctree_control(mincriterion=0.95))
+#Estimacion
+n1=dim(train_parametrica)
+yprob=sapply(predict(datos.tree, newdata=train_parametrica,type="prob"),'[[',2)
+fit.roc1<-roc(train_parametrica$Loan_Status, yprob)
+#Gini
+datos.tree.gini = 2*c(fit.roc1$auc)-1
+#Indicador Kolmogorov-Smirnov
+datos.tree.ks = ks.test(yprob[train_parametrica$Loan_Status==1],yprob[train_parametrica$Loan_Status==0])
+plot(datos.tree,main=paste("ApplicantIncome (GINI:", round(100*datos.tree.gini,2),"% | KS:", round(100*datos.tree.ks$statistic,2), "%)","Casos: ", n1[1],  sep=" "), cex=0.5,type="simple")
+
+
+
+#### Usando Intervalos Optimos para modelos scoring (Var. Continuas) ####
+## Target: Debe ser ENTERO o INT
+##install.packages("smbinning")
+library(smbinning)
+
+##RECORDEMOS QUE SIGNIFICA IV
+## IV < 0.02 NO es UTIL para la PREDICCION
+## IV 0,02 a  0,1 	PODER PREDICTIVO DEBIL
+## IV 0.1 a 0.3 PODER DE PREDICCION MEDIA
+## IV > 0.3 A 0.5 MODELO FUERTE
+## IV > 0.5 PODER PREDICTIVO SOSPECHOSO
+
+# Variable "Ingreso" ##MODELO PREDICTIVO MEDIA ##MAYOR IV
+par(mfrow=c(1,1))
+resultado = smbinning(df=datos.train,y="TARGET",x="Ingreso",p = 0.05)
+resultado$ivtable
+resultado$iv
+
+
+
+# Variable "Ingreso_1" ##PODER DE PREDICCION MEDIA
+par(mfrow=c(1,1))
+resultado = smbinning.factor(df=datos.train,y="TARGET",x="Ingreso_1",maxcat = 10)
+resultado$ivtable
+resultado$iv
+
+
+
+
+# Variable "Flg_vehicular" ##PODER DE PREDICCION MEDIA
+par(mfrow=c(1,1))
+resultado = smbinning.factor(df=datos.train,y="TARGET",x="Flg_vehicular",maxcat = 10)
+resultado$ivtable
+resultado$iv
+
+
+
+
+# Variable "TipoVivienda" ##NO ES UTIL PARA PREDICCION
+par(mfrow=c(1,1))
+resultado = smbinning.factor(df=datos.train,y="TARGET",x="TipoVivienda",maxcat = 10)
+resultado$ivtable
+resultado$iv
+
+
+
+
+####################
+# Variable "Ingreso" ##MODELO PREDICTIVO MEDIA ##MAYOR IV ##1
+par(mfrow=c(1,1))
+resultado = smbinning(df=datos.train,y="TARGET",x="Ingreso",p = 0.05)
+resultado$ivtable
+resultado$iv
+
+# Relevant plots (2x2 Page) 
+par(mfrow=c(2,2))
+boxplot(datos.train$Ingreso ~ datos.train$TARGET, 
+        horizontal=T, frame=F, col="lightgray",main="Distribution") 
+mtext("Ingreso",3)
+smbinning.plot(resultado,option="dist",sub="Ingreso") 
+smbinning.plot(resultado,option="badrate",sub="Ingreso") 
+smbinning.plot(resultado,option="WoE",sub="Ingreso")
+
+
+#################
+
+
+
+# Variable "TipoVivienda" ##MODELO FUERTE ##2
+par(mfrow=c(1,1))
+resultado = smbinning.factor(df=datos.train,y="TARGET",x="TipoVivienda",maxcat = 10)
+resultado$ivtable
+resultado$iv
+
+
+##TipoVivienda
+par(mfrow=c(2,2))
+boxplot(datos.train$TipoVivienda ~ datos.train$TARGET, 
+        horizontal=T, frame=F, col="lightgray",main="Distribution") 
+mtext("TipoVivienda",3)
+smbinning.plot(resultado,option="dist",sub="TipoVivienda") 
+smbinning.plot(resultado,option="badrate",sub="TipoVivienda") 
+smbinning.plot(resultado,option="WoE",sub="TipoVivienda")
+
+
+
+#################
+
+# Variable "Flg_vehicular" 	##PODER PREDICTIVO DEBIL
+par(mfrow=c(1,1))
+resultado = smbinning.factor(df=datos.train,y="TARGET",x="Flg_vehicular",maxcat = 10)
+resultado$ivtable
+resultado$iv
+
+
+##Flg_vehicular
+par(mfrow=c(2,2))
+boxplot(datos.train$Flg_vehicular ~ datos.train$TARGET, 
+        horizontal=T, frame=F, col="lightgray",main="Distribution") 
+mtext("Flg_vehicular",3)
+smbinning.plot(resultado,option="dist",sub="Flg_vehicular") 
+smbinning.plot(resultado,option="badrate",sub="Flg_vehicular") 
+smbinning.plot(resultado,option="WoE",sub="Flg_vehicular")
+
+
+
+# Target: Debe estar en formato FACTOR  0.6923077  0.6536313
+prior=sum(datos.train$Default==1)/(2*(length(datos.train$Default)))
+prior
+
+
+#### Funciones para variables categóricas ####
+
+#Creando una función estadistica ##rechazar la hipotesis si el p > 0.01
+relevancia=function(Target,VariableCategorica){
+  levels=levels(VariableCategorica)
+  colors=c()
+  for (i in 1:length(levels)){
+    TABLA=table(Target,VariableCategorica==levels[i])
+    chi=chisq.test(TABLA)
+    if (chi$p.value<0.01){
+      colors=c(colors,"green")
+    }else{
+      colors=c(colors,"gray")
+    }
+  }
+  TABLA=table(Target,VariableCategorica)
+  plot=barplot(100*TABLA[2,]/(TABLA[1,]+TABLA[2,]),ylim=c(0,50),col=colors,cex.names=1)
+  text(x=plot,
+       y=5+100*TABLA[2,]/(TABLA[1,]+TABLA[2,]),labels=paste(round(100*TABLA[2,]/(TABLA[1,]+TABLA[2,]),2),"%",sep=""))
+  abline(h=100*prior,col="red")
+}
+
+
+
+#Aplicando función a cada variable
+##funcion variables categoricas significativas
+
+#Los grupos con mayor nivel de significancia es alquilada y propia
+#rechazamos la hipotesis cuando el p es mas pequeño
+par(mfrow=c(1,1))
+relevancia(datos.train$Default,datos.train$TipoVivienda)
+
+
+#Aplicando WOE
+
+
+woe_iv=function(Target,VariableCategorica){
+  Tabla_WOE=table(VariableCategorica,Target)
+  DF_WOE=data.frame(FRACASOS=Tabla_WOE[,2],EXITOS=Tabla_WOE[,1])
+  DF_WOE$EXITOS_PORC=DF_WOE$EXITOS/sum(DF_WOE$EXITOS)
+  DF_WOE$FRACASOS_PORC=DF_WOE$FRACASOS/sum(DF_WOE$FRACASOS)
+  DF_WOE$WOE=log(DF_WOE$EXITOS_PORC/DF_WOE$FRACASOS_PORC)
+  DF_WOE$IV=(DF_WOE$EXITOS_PORC-DF_WOE$FRACASOS_PORC)*DF_WOE$WOE
+  DF_WOE
+}
+
+WOE_CAT_Ingreso_1=woe_iv(datos.train$Default,datos.train$Ingreso_1)
+WOE_CAT_Ingreso_1
+IV_CAT_Ingreso_1=sum(WOE_CAT_Ingreso_1$IV)
+IV_CAT_Ingreso_1
+
+
+
+WOE_CAT_TipoVivienda=woe_iv(datos.train$Default,datos.train$TipoVivienda)
+WOE_CAT_TipoVivienda
+IV_CAT_TipoVivienda=sum(WOE_CAT_TipoVivienda$IV)
+IV_CAT_TipoVivienda
+
+
+
+WOE_CAT_Flg_vehicular=woe_iv(datos.train$Default,datos.train$Flg_vehicular)
+WOE_CAT_Flg_vehicular
+IV_CAT_Flg_vehicular=sum(WOE_CAT_Flg_vehicular$IV)
+IV_CAT_Flg_vehicular
+
+
+
+
+#### Categorización de variables (Transformación a valores WoE) ####ASIGNANDO
+##### Muestra de Entrenamiento #####
+datos.train$Ingreso_1_W <- datos.train$Ingreso_1
+datos.train$Ingreso_1_W[datos.train$Ingreso_1_W == 1] <- -0.98
+datos.train$Ingreso_1_W[datos.train$Ingreso_1_W == 2] <- -1.11
+datos.train$Ingreso_1_W[datos.train$Ingreso_1_W == 3] <- 2.17
+
+
+# Variable: TipoVivienda
+datos.train$TipoVivienda_W <- as.numeric(datos.train$TipoVivienda)
+datos.train$TipoVivienda_W[datos.train$TipoVivienda_W == 1] <- -1.11
+datos.train$TipoVivienda_W[datos.train$TipoVivienda_W == 2] <- -0.62
+datos.train$TipoVivienda_W[datos.train$TipoVivienda_W == 3] <- 1.53
+
+
+# Variable:Flg_vehicular
+datos.train$Flg_vehicular_W <- datos.train$Flg_vehicular
+datos.train$Flg_vehicular_W [datos.train$Flg_vehicular_W  == 0] <- -1.08
+datos.train$Flg_vehicular_W [datos.train$Flg_vehicular_W  == 1] <-  1.53
+
+
+
+####Muestra de Validacion/Test####
+# Variable:Ingreso_1
+datos.test$Ingreso_1_W <- datos.test$Ingreso_1
+datos.test$Ingreso_1_W[datos.test$Ingreso_1_W == 1] <- -0.98
+datos.test$Ingreso_1_W[datos.test$Ingreso_1_W == 2] <- -1.11
+datos.test$Ingreso_1_W[datos.test$Ingreso_1_W == 3] <- 2.17
+
+
+
+# Variable: TipoVivienda
+datos.test$TipoVivienda_W <-  as.numeric(datos.test$TipoVivienda)
+datos.test$TipoVivienda_W[datos.test$TipoVivienda_W == 1] <- -1.11
+datos.test$TipoVivienda_W[datos.test$TipoVivienda_W == 2] <- -0.62
+datos.test$TipoVivienda_W[datos.test$TipoVivienda_W == 3] <- 1.53
+
+
+
+# Variable: Flg_vehicular
+datos.test$Flg_vehicular_W <- datos.test$Flg_vehicular
+datos.test$Flg_vehicular_W[datos.test$Flg_vehicular_W == 0] <- -1.08
+datos.test$Flg_vehicular_W[datos.test$Flg_vehicular_W == 1] <- 1.53
+
+
+#### Estimación del modelo (usando variables originales) ####TipoVivienda ##Ingreso_1
+modelo_original <- glm(Default ~ Ingreso_1+TipoVivienda+Flg_vehicular,
+                       family=binomial(link = "logit"), data=datos.train)
+
+summary(modelo_original)
+
+
+
+## Estimacion del modelo (usando variables WoE)###TipoVivienda_W ###Ingreso_1_W
+modelo_woe <- glm(Default ~ Ingreso_1_W+TipoVivienda_W+Flg_vehicular_W,
+                  family=binomial(link = "logit"), data=datos.train)
+
+summary(modelo_woe)
+AIC(modelo_woe); BIC(modelo_woe)
+
+
+
+#install.packages("stargazer")
+library(stargazer)
+stargazer(modelo_original,modelo_woe, type="html", out="models.html")
+
+
+
+#### Validación del modelo ####
+#yprobf_o <- predict(modelo_original, newdata=datos.test[,-1], type="response")
+yprobf_w <- predict(modelo_woe, newdata=datos.test[,-1], type="response")
+
+yreal <- datos.test$Default #copia de la variable dependiente
+
+ypred <- as.numeric((predict(modelo_woe, newdata=datos.test[,-1], type="response") >= prior)) #punto de corte
+
+
+
+
+## Matriz de confusión (error Clasificación)
+modelo_w.mc<-table(yreal,ypred)
+modelo_w.mc
+
+##EN CASO DE QUE MALO=1 (default)
+tp<-sum(ypred==1 & yreal==1) ##default, default
+
+tn<-sum(ypred==0 & yreal==0) ##no default, no default
+
+fp<-sum(ypred==0 & yreal==1) ##no default, default
+
+fn<-sum(ypred==1 & yreal==0) ##default, no default
+
+data.frame(tp,tn,fp,fn)
+
+
+positive <- sum(yreal==1)
+negative <- sum(yreal==0)
+predicted_positive <- sum(ypred==1)
+predicted_negative <- sum(ypred==0)
+total <- tp + tn + fp + fn
+
+
+
+accuracy <- (tp+tn)/total
+error_rate <- (fp+fn)/total
+sensitivity <- tp/positive
+especificity <- tn/negative
+precision <- tp/predicted_positive
+npv <- tn / predicted_negative
+
+
+data.frame(accuracy,error_rate,sensitivity,especificity,precision,npv)
+
+
+###en caso de que MALO = 0 DEFAULT
+
+##modelo_w.mc<-table(yreal,ypred)
+##modelo_w.mc
+
+##modelo_w.mc<- table(ypred)
+##modelo_w.mc 
+
+
+##tp<-sum(ypred==0 & yreal==0)
+##tn<-sum(ypred==1 & yreal==1)
+##fp<-sum(ypred==1 & yreal==0)
+##fn<-sum(ypred==0 & yreal==1)
+##data.frame(tp,tn,fp,fn)
+
+##positive <- sum(yreal==0)
+##negative <- sum(yreal==1)
+##predicted_positive <- sum(ypred==0)
+##predicted_negative <- sum(ypred==1)
+##total <- tp + tn + fp + fn
+
+#accuracy <- (tp+tn)/total
+#error_rate <- (fp+fn)/total
+#sensitivity <- tp/positive
+#especificity <- tn/negative
+#precision <- tp/predicted_positive
+#npv <- tn / predicted_negative
+#data.frame(accuracy,error_rate,sensitivity,especificity,precision,npv)
+
+
+
+# Creando variable rango probabilidad proyectada
+rng_prob <- yprobf_w
+rng_prob[yprobf_w<=quantile(yprobf_w, probs = 0.1)] <- quantile(yprobf_w, probs = 0.1)
+rng_prob[yprobf_w>quantile(yprobf_w, probs = 0.1) & yprobf_w<=quantile(yprobf_w, probs = 0.2)] <- quantile(yprobf_w, probs = 0.2)
+rng_prob[yprobf_w>quantile(yprobf_w, probs = 0.2) & yprobf_w<=quantile(yprobf_w, probs = 0.3)] <- quantile(yprobf_w, probs = 0.3)
+rng_prob[yprobf_w>quantile(yprobf_w, probs = 0.3) & yprobf_w<=quantile(yprobf_w, probs = 0.4)] <- quantile(yprobf_w, probs = 0.4)
+rng_prob[yprobf_w>quantile(yprobf_w, probs = 0.4) & yprobf_w<=quantile(yprobf_w, probs = 0.5)] <- quantile(yprobf_w, probs = 0.5)
+rng_prob[yprobf_w>quantile(yprobf_w, probs = 0.5) & yprobf_w<=quantile(yprobf_w, probs = 0.6)] <- quantile(yprobf_w, probs = 0.6)
+rng_prob[yprobf_w>quantile(yprobf_w, probs = 0.6) & yprobf_w<=quantile(yprobf_w, probs = 0.7)] <- quantile(yprobf_w, probs = 0.7)
+rng_prob[yprobf_w>quantile(yprobf_w, probs = 0.7) & yprobf_w<=quantile(yprobf_w, probs = 0.8)] <- quantile(yprobf_w, probs = 0.8)
+rng_prob[yprobf_w>quantile(yprobf_w, probs = 0.8) & yprobf_w<=quantile(yprobf_w, probs = 0.9)] <- quantile(yprobf_w, probs = 0.9)
+rng_prob[yprobf_w>quantile(yprobf_w, probs = 0.9) & yprobf_w<=quantile(yprobf_w, probs = 1.0)] <- quantile(yprobf_w, probs = 1.0)
+
+# Tablas cruzadas (2 variables)
+tabla_c=table(rng_prob,datos.test$Default)
+tabla_c
+tabla_p=prop.table(tabla_c,margin=1)
+tabla_p
+
+# Calculo del area debajo de la Curva ROC (AUC)
+#install.packages("pROC")
+library(pROC)
+#resultado_reglog_o <- roc(response=yreal, predictor=yprobf_o)
+#resultado_reglog_o$auc
+resultado_reglog_w <- roc(response=yreal, predictor=yprobf_w)
+resultado_reglog_w$auc
+
+
+#install.packages("ROCR")
+library(ROCR)
+par(mfrow=c(1,1))
+pred <- prediction(yprobf_w,yreal)
+perf <- performance(pred,"tpr","fpr")
+plot(perf)
+
+# Cálculo del KS ##SI ES POR ENCIMA DEL 0.04 es bueno
+KS = max(attr(perf,'y.values')[[1]]-attr(perf,'x.values')[[1]])
+KS
+
+#### Exportamos datos a csv o txt ####
+datos.test$PD <- yprobf_w
+datos.test$RPD <- rng_prob
+
+write.csv(datos.test,file="data_test.csv")
+write.table(datos.test,file="data_test.txt")
+
+
+
+
